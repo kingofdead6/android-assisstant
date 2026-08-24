@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">John</string>
+
+    <string name="assistant_channel_name">Assistant</string>
+    <string name="assistant_channel_description">Shown while John is listening for the wake word.</string>
+    <string name="reminder_channel_name">Reminders</string>
+    <string name="reminder_channel_description">Reminders you asked John to set.</string>
+
+    <string name="foreground_notification_title">John is listening</string>
+    <string name="foreground_notification_text">Say &#8220;Hey John&#8221; to start.</string>
+    <string name="foreground_notification_stop">Stop</string>
+
+    <string name="accessibility_service_label">John screen assistance</string>
+    <string name="accessibility_service_description">Optional. Lets John read the screen and tap for you in apps that offer no other way to be controlled. John only acts when you ask it to, and never records what is on screen.</string>
+</resources>

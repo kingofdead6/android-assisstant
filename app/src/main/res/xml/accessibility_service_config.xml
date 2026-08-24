@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Deliberately narrow.
+
+  John does not observe the screen continuously: `canRetrieveWindowContent` is
+  needed to read a window on demand, but no event types are subscribed to by
+  default, so the service receives nothing until a tool explicitly asks for the
+  current window. flagRetrieveInteractiveWindows is off — John has no reason to
+  see windows the user is not looking at.
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagDefault|flagReportViewIds"
+    android:canPerformGestures="false"
+    android:canRetrieveWindowContent="true"
+    android:description="@string/accessibility_service_description"
+    android:notificationTimeout="300"
+    android:settingsActivity="com.john.assistant.MainActivity"
+    android:summary="@string/accessibility_service_description" />

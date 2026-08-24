@@ -1,0 +1,9 @@
+# Android source trees checked by tools/verify-android-sources.sh.
+#
+# Only trees that depend on the Android framework, javax.inject and :core can be
+# listed here. Compose UI, Room entities/DAOs and Hilt-generated code need the
+# real AndroidX artifacts and are checked by a normal Gradle build instead.
+app/src/main/java/com/john/assistant/platform
+app/src/main/java/com/john/assistant/tools
+app/src/main/java/com/john/assistant/permissions
+app/src/main/java/com/john/assistant/ai
