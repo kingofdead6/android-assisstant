@@ -7,3 +7,4 @@ app/src/main/java/com/john/assistant/platform
 app/src/main/java/com/john/assistant/tools
 app/src/main/java/com/john/assistant/permissions
 app/src/main/java/com/john/assistant/ai
+app/src/main/java/com/john/assistant/integrations

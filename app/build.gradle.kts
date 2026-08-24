@@ -99,7 +99,6 @@ dependencies {
 
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.security.crypto)
-    implementation(libs.androidx.work.runtime.ktx)
 
     testImplementation(libs.junit4)
     testImplementation(libs.kotlinx.coroutines.test)
