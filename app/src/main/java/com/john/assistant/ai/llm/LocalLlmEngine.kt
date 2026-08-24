@@ -2,6 +2,7 @@ package com.john.assistant.ai.llm
 
 import com.john.assistant.ai.model.ModelManager
 import com.john.assistant.core.llm.ChatMessage
+import com.john.assistant.core.llm.ChatTemplate
 import com.john.assistant.core.llm.LlmEngine
 import com.john.assistant.core.llm.LlmOptions
 import com.john.assistant.core.llm.LlmResponse

@@ -14,14 +14,10 @@ hiltNavigationCompose = "1.2.0"
 room = "2.6.1"
 datastore = "1.1.1"
 security = "1.1.0-alpha06"
-browser = "1.8.0"
 junit4 = "4.13.2"
 junitJupiter = "5.11.3"
 androidxTestJunit = "1.2.1"
 espresso = "3.6.1"
-turbine = "1.2.0"
-mockk = "1.13.13"
-robolectric = "4.14.1"
 
 [libraries]
 # --- Kotlin / KotlinX (JVM-safe: available from Maven Central) ---
@@ -37,7 +33,6 @@ androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-ru
 androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
 androidx-lifecycle-service = { module = "androidx.lifecycle:lifecycle-service", version.ref = "lifecycle" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
-androidx-browser = { module = "androidx.browser:browser", version.ref = "browser" }
 
 # --- Compose ---
 androidx-compose-bom = { module = "androidx.compose:compose-bom", version.ref = "composeBom" }
@@ -55,6 +50,7 @@ androidx-navigation-compose = { module = "androidx.navigation:navigation-compose
 hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hilt" }
 hilt-compiler = { module = "com.google.dagger:hilt-compiler", version.ref = "hilt" }
 hilt-navigation-compose = { module = "androidx.hilt:hilt-navigation-compose", version.ref = "hiltNavigationCompose" }
+hilt-android-testing = { module = "com.google.dagger:hilt-android-testing", version.ref = "hilt" }
 
 # --- Room ---
 room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
@@ -70,9 +66,6 @@ androidx-security-crypto = { module = "androidx.security:security-crypto", versi
 junit4 = { module = "junit:junit", version.ref = "junit4" }
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junitJupiter" }
 junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junitJupiter" }
-turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
-mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
-robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 androidx-test-junit = { module = "androidx.test.ext:junit", version.ref = "androidxTestJunit" }
 androidx-test-espresso-core = { module = "androidx.test.espresso:espresso-core", version.ref = "espresso" }
 

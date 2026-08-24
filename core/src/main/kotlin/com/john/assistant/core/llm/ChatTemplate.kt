@@ -1,7 +1,4 @@
-package com.john.assistant.ai.llm
-
-import com.john.assistant.core.llm.ChatMessage
-import com.john.assistant.core.llm.ChatRole
+package com.john.assistant.core.llm
 
 /**
  * Renders a conversation in the prompt format a given model family expects.

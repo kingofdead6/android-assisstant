@@ -2,7 +2,6 @@ package com.john.assistant.tools.system
 
 import com.john.assistant.core.tool.AssistantTool
 import com.john.assistant.core.tool.ParameterType
-import com.john.assistant.core.tool.PermissionKey
 import com.john.assistant.core.tool.ToolArguments
 import com.john.assistant.core.tool.ToolParameter
 import com.john.assistant.core.tool.ToolParameters
@@ -98,8 +97,15 @@ class GetDeviceStateTool @Inject constructor(
         ),
     )
 
-    override val requiredPermissions = setOf(PermissionKey.BLUETOOTH)
-
+    /**
+     * Deliberately no required permission.
+     *
+     * This tool answers network questions as well as Bluetooth ones, so gating
+     * it on BLUETOOTH_CONNECT would make "am I online?" demand a permission it
+     * does not need. Bluetooth state degrades on its own instead: without the
+     * grant [DeviceStateProvider.isBluetoothOn] returns null and John says it
+     * cannot check — which is not the same as saying Bluetooth is off.
+     */
     override val examples = listOf("am I online", "is bluetooth on", "what are my buds connected to")
 
     override suspend fun execute(arguments: ToolArguments): ToolResult {

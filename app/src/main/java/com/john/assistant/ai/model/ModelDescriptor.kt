@@ -1,6 +1,6 @@
 package com.john.assistant.ai.model
 
-import com.john.assistant.ai.llm.ChatTemplate
+import com.john.assistant.core.llm.ChatTemplate
 
 /** What kind of model this is. */
 enum class ModelKind { LANGUAGE, SPEECH_TO_TEXT, TEXT_TO_SPEECH, WAKE_WORD }
