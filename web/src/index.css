@@ -1,0 +1,120 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * A note on `dark:` inside `@apply`.
+ *
+ * The theme class lives on <html>. Tailwind compiles a `dark:` utility used
+ * inside `@apply` to `<selector>:is(.dark *)` — a *descendant* combinator. That
+ * works for anything nested inside body, but never for `body` itself, which is
+ * html's child, not its descendant-with-an-ancestor-between. Rather than rely
+ * on that distinction being remembered, every themed rule in this file is
+ * written as an explicit `.dark <selector>` pair using `theme()` values.
+ *
+ * Component classes used *in markup* (not via @apply) can still use `dark:`
+ * normally — that path compiles correctly.
+ */
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* The body paints an explicit ground in both themes — never transparent,
+     which would borrow whatever is behind it. */
+  body {
+    @apply font-body antialiased;
+    background-color: theme('colors.ground.light');
+    color: theme('colors.ink.light');
+    font-size: 17px;
+    line-height: 1.65;
+  }
+
+  .dark body {
+    background-color: theme('colors.ground.dark');
+    color: theme('colors.ink.dark');
+  }
+
+  h1, h2, h3 {
+    @apply font-display font-semibold;
+    text-wrap: balance;
+  }
+
+  :focus-visible {
+    outline: 2px solid theme('colors.accent.light');
+    outline-offset: 3px;
+    border-radius: 3px;
+  }
+
+  .dark :focus-visible {
+    outline-color: theme('colors.accent.dark');
+  }
+}
+
+@layer components {
+  /* Section shell — one place that owns horizontal rhythm, so sibling
+     sections can never fight each other over padding. */
+  .shell {
+    @apply w-[min(1080px,100%-3rem)] mx-auto;
+  }
+
+  .eyebrow {
+    @apply font-mono text-[0.72rem] tracking-[0.16em] uppercase;
+    color: theme('colors.ink-3.light');
+  }
+  .dark .eyebrow {
+    color: theme('colors.ink-3.dark');
+  }
+
+  .card {
+    @apply rounded-[10px] p-6 flex flex-col gap-2.5 border;
+    background-color: theme('colors.surface.light');
+    border-color: theme('colors.line.light');
+  }
+  .dark .card {
+    background-color: theme('colors.surface.dark');
+    border-color: theme('colors.line.dark');
+  }
+
+  .chip {
+    @apply font-mono text-[0.78rem] px-2.5 py-1.5 rounded-[5px] border;
+    @apply transition-[color,border-color,transform] duration-150;
+    background-color: theme('colors.raised.light');
+    border-color: theme('colors.line.light');
+    color: theme('colors.ink-2.light');
+  }
+  .chip:hover {
+    border-color: theme('colors.accent.light');
+    color: theme('colors.accent.light');
+    transform: translateY(-1px);
+  }
+  .dark .chip {
+    background-color: theme('colors.raised.dark');
+    border-color: theme('colors.line.dark');
+    color: theme('colors.ink-2.dark');
+  }
+  .dark .chip:hover {
+    border-color: theme('colors.accent.dark');
+    color: theme('colors.accent.dark');
+  }
+
+  .rule {
+    @apply border-0 border-t;
+    border-top-color: theme('colors.line.light');
+  }
+  .dark .rule {
+    border-top-color: theme('colors.line.dark');
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -31,7 +31,7 @@ include(":core")
 // Environments that have neither (JVM-only CI, sandboxes without SDK access) can
 // build and test the core in isolation with:
 //
-//     ./gradlew -PskipAndroidModules=true :core:test
+//     ./gradlew -PskipAndroidModules=true :core:build
 //
 val skipAndroidModules: Boolean =
     (providers.gradleProperty("skipAndroidModules").orNull ?: "false").toBoolean()

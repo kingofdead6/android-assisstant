@@ -11,3 +11,7 @@ local.properties
 *.hprof
 /models/
 .verify-cache/
+
+# Eclipse/IDE compiler output - duplicates src/
+bin/
+/files/

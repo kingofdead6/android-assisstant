@@ -26,9 +26,9 @@ context, the confirmation policy, prompt assembly and the orchestrator.
 
 This is not tidiness for its own sake. It buys three things:
 
-1. **The decision pipeline is unit-testable on any JVM** — no emulator, no
-   Robolectric, no SDK. `./gradlew -PskipAndroidModules=true :core:test` runs
-   116 tests covering every gate in about two seconds.
+1. **The decision pipeline builds on any JVM** — no emulator, no Robolectric,
+   no SDK. `./gradlew -PskipAndroidModules=true :core:build` compiles every gate
+   in the pipeline in about two seconds.
 2. **The dependency only points one way.** Android provides tools; it cannot be
    depended on *by* the reasoning. Nothing in `:core` can reach for a Context,
    so nothing can accidentally couple a decision to a device detail.

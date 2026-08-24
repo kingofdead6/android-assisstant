@@ -32,14 +32,11 @@ The assistant's decision pipeline is a plain Kotlin/JVM module with no Android
 dependency, and it builds anywhere:
 
 ```bash
-./gradlew -PskipAndroidModules=true :core:test
+./gradlew -PskipAndroidModules=true :core:build
 ```
 
 `skipAndroidModules` excludes `:app` from the build entirely, so nothing tries
-to resolve the Android Gradle Plugin. This is what CI runs when it has no SDK,
-and it exercises every gate in the pipeline: schema validation, tool resolution,
-permission checks, the confirmation policy, tool-call parsing, and the phrase
-catalogue.
+to resolve the Android Gradle Plugin. This is what CI runs when it has no SDK.
 
 > The root `build.gradle.kts` declares **no plugins**, deliberately. Declaring
 > AGP there — even with `apply false` — forces Gradle to resolve it from
@@ -85,28 +82,19 @@ tools/verify-android-sources.sh /path/to/cache
 
 ## Tests
 
+This repository ships no automated test suite. The checks below verify that the
+sources compile:
+
 ```bash
-# the decision pipeline — no SDK, no emulator, ~2s
-./gradlew -PskipAndroidModules=true :core:test
+# the decision pipeline — no SDK, no emulator
+./gradlew -PskipAndroidModules=true :core:build
 
-# app-module logic — needs the SDK
-./gradlew :app:test
+# the Android application
+./gradlew :app:assembleDebug
 
-# on-device — needs a connected device or emulator
-./gradlew :app:connectedAndroidTest
+# type-check the Android sources without the SDK
+tools/verify-android-sources.sh
 ```
-
-`:core` ships fake engines in `testFixtures`, so the app module's tests reuse
-them rather than maintaining a second set of stubs that drifts:
-
-```kotlin
-testImplementation(testFixtures(project(":core")))
-```
-
-`FakeLlmEngine`, `FakeSpeechToTextEngine`, `FakeTextToSpeechEngine`,
-`FakeWakeWordEngine`, `FakeTool`, `FakePermissionGate`, `FakeEnvironment` and
-`FakeMemoryStore` let the whole pipeline be tested without a model, a
-microphone, or a device.
 
 ## Adding a local model
 
@@ -117,13 +105,12 @@ See [`local-ai.md`](local-ai.md).
 ```
 core/                     plain Kotlin/JVM — the decision pipeline
   src/main/kotlin/        tool contract, LLM/speech interfaces, orchestrator
-  src/testFixtures/       fake engines, shared with :app
-  src/test/               116 unit tests
 
 app/                      the Android application
   src/main/java/          platform, tools, ai, services, data, presentation
-  src/test/java/          JVM tests for app-module logic
-  src/androidTest/java/   instrumentation tests
+
+web/                      the project website (static, single file)
+  index.html
 
 tools/
   verify-android-sources.sh

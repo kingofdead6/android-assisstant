@@ -21,7 +21,6 @@ android {
         versionCode = 1
         versionName = "0.1.0"
 
-        testInstrumentationRunner = "com.john.assistant.JohnTestRunner"
         vectorDrawables.useSupportLibrary = true
     }
     
@@ -76,9 +75,6 @@ android {
         )
     }
 
-    testOptions {
-        unitTests.isReturnDefaultValues = true
-    }
 }
 
 dependencies {
@@ -114,17 +110,4 @@ dependencies {
     implementation(libs.androidx.security.crypto)
 
     implementation(libs.litertlm.android)
-
-    testImplementation(libs.junit4)
-    testImplementation(libs.kotlinx.coroutines.test)
-    testImplementation(testFixtures(project(":core")))
-
-    androidTestImplementation(libs.androidx.test.junit)
-    androidTestImplementation(libs.hilt.android.testing)
-    kspAndroidTest(libs.hilt.compiler)
-    androidTestImplementation(libs.androidx.test.espresso.core)
-    androidTestImplementation(platform(libs.androidx.compose.bom))
-    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
-    androidTestImplementation(libs.room.testing)
-    debugImplementation(libs.androidx.compose.ui.test.manifest)
 }

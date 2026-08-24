@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="John is a voice-controlled, local-first AI assistant for Android. The model picks one tool from a fixed list; the app decides whether it runs.">
+<link rel="icon" type="image/svg+xml" href="/icon.svg">
+<link rel="apple-touch-icon" href="./src/bot.png">
+<title>John, the Local-First Assistant</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap">
+
+<script>
+  // Resolve the theme before first paint, so the page never flashes the wrong
+  // ground. A stored choice wins; otherwise follow the OS.
+  (function () {
+    try {
+      var stored = localStorage.getItem('john-theme');
+      var dark = stored ? stored === 'dark'
+        : window.matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.classList.toggle('dark', dark);
+    } catch (e) {
+      // Private mode or blocked storage — fall back to the OS preference.
+      try {
+        document.documentElement.classList.toggle(
+          'dark',
+          window.matchMedia('(prefers-color-scheme: dark)').matches
+        );
+      } catch (_) { /* leave the light default */ }
+    }
+  })();
+</script>
+</head>
+<body>
+<div id="root"></div>
+<script type="module" src="/src/main.jsx"></script>
+</body>
+</html>
