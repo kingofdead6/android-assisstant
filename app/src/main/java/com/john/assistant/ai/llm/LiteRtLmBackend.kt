@@ -1,6 +1,7 @@
 package com.john.assistant.ai.llm
 
 import android.content.Context
+import android.os.Build
 import com.google.ai.edge.litertlm.Backend
 import com.google.ai.edge.litertlm.Content
 import com.google.ai.edge.litertlm.ConversationConfig
@@ -52,17 +53,58 @@ class LiteRtLmBackend @Inject constructor(
      * still a boolean — rather than as a NoClassDefFoundError on the first
      * utterance, long after John has told the user it is ready.
      */
-    override val isSupported: Boolean by lazy {
-        runCatching {
+    override val isSupported: Boolean by lazy { probeNativeRuntime() }
+
+    /**
+     * Load the JNI library once and say plainly why it failed.
+     *
+     * The three failure modes need different fixes, and collapsing them into a
+     * single "unavailable" line is what sends someone hunting through the
+     * fallback intent error instead of the packaging config:
+     *
+     *  - [ClassNotFoundException] — the AAR was shrunk or excluded from this variant.
+     *  - [UnsatisfiedLinkError] — the `.so` is missing for this ABI, or it was
+     *    stored compressed and the loader could not map it. That is the
+     *    "Failed to punch uncompressed elf file" case, fixed by `noCompress`
+     *    plus `useLegacyPackaging` in build.gradle.kts.
+     *
+     * Both are logged at error level with the ABI list, because on a user's
+     * device logcat is the only evidence anyone gets.
+     */
+    private fun probeNativeRuntime(): Boolean {
+        try {
             Class.forName(ENGINE_CLASS, false, javaClass.classLoader)
-            System.loadLibrary(NATIVE_LIBRARY)
-        }.onFailure { error ->
-            logger.warn(
+        } catch (error: ClassNotFoundException) {
+            logger.error(
                 TAG,
-                "LiteRT-LM runtime unavailable: ${error.message ?: error::class.java.name}",
+                "LiteRT-LM classes are not in this build ($ENGINE_CLASS missing); " +
+                    "on-device inference is disabled",
                 error,
             )
-        }.isSuccess
+            return false
+        } catch (error: Throwable) {
+            logger.error(TAG, "Could not resolve $ENGINE_CLASS", error)
+            return false
+        }
+
+        return try {
+            System.loadLibrary(NATIVE_LIBRARY)
+            logger.info(TAG, "Loaded native library lib$NATIVE_LIBRARY.so")
+            true
+        } catch (error: UnsatisfiedLinkError) {
+            logger.error(
+                TAG,
+                "Could not load lib$NATIVE_LIBRARY.so for ABIs " +
+                    "${Build.SUPPORTED_ABIS.joinToString()}: ${error.message ?: error.toString()}. " +
+                    "If this reads 'Failed to punch uncompressed elf file', the library was " +
+                    "packaged compressed — check noCompress/useLegacyPackaging in build.gradle.kts.",
+                error,
+            )
+            false
+        } catch (error: SecurityException) {
+            logger.error(TAG, "Blocked from loading lib$NATIVE_LIBRARY.so", error)
+            false
+        }
     }
 
     @Volatile

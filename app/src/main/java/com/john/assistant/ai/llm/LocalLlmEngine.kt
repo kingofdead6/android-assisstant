@@ -33,12 +33,30 @@ class LocalLlmEngine @Inject constructor(
 ) : LlmEngine {
 
     override val displayName: String
-        get() = modelManager.activeModel()?.displayName ?: "No model installed"
+        get() = modelManager.activeModel()?.displayName ?: "No model selected"
 
     override val runsLocally: Boolean = true
 
+    /**
+     * Whether this engine can serve a turn — not whether it already has.
+     *
+     * Deliberately *not* `backend.isLoaded`. Weights load lazily on the first
+     * real request (see [generate]), so a freshly installed model is never
+     * loaded until something asks it to generate. Gating readiness on
+     * `isLoaded` made that unreachable: `CompositeLlmEngine` skips a fallback
+     * that is not ready, so the model was never asked, so it never loaded —
+     * John reported "no model" with a model sitting installed and selected on
+     * the models screen.
+     *
+     * The honest question is whether there is a runtime and a downloaded model
+     * to load, which is what this now answers.
+     */
     override val isReady: Boolean
-        get() = backend.isSupported && backend.isLoaded
+        get() = backend.isSupported && (backend.isLoaded || hasInstalledModel())
+
+    /** A selected model whose weights are actually on disk. */
+    private fun hasInstalledModel(): Boolean =
+        modelManager.activeModel()?.let { modelManager.fileFor(it) != null } == true
 
     override suspend fun warmUp() {
         if (!backend.isSupported) {

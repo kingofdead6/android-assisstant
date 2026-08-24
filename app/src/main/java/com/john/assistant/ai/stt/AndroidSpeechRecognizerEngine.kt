@@ -173,6 +173,32 @@ class AndroidSpeechRecognizerEngine @Inject constructor(
             // that cannot go offline fall back to network and say so via
             // ERROR_LANGUAGE_UNAVAILABLE rather than silently uploading.
             putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+
+            // How long a pause is allowed before the recogniser decides the
+            // utterance is over.
+            //
+            // Without these the platform default applies, and several OEM
+            // recognisers set it near half a second — short enough that a
+            // normal pause mid-sentence ends the turn, which reads to the user
+            // as the microphone cutting them off. A command like "remind me to
+            // call Sam ... tomorrow at nine" is one utterance, not two.
+            //
+            // These are documented as hints: a recogniser is free to ignore
+            // them, so this improves the common case rather than guaranteeing
+            // it everywhere.
+            putExtra(
+                RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS,
+                SILENCE_BEFORE_END_MILLIS,
+            )
+            putExtra(
+                RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS,
+                SILENCE_BEFORE_END_MILLIS,
+            )
+            // Do not end the turn before the user has plausibly started.
+            putExtra(
+                RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS,
+                MINIMUM_UTTERANCE_MILLIS,
+            )
         }
 
     private fun Bundle?.firstTranscript(): String? =
@@ -212,5 +238,17 @@ class AndroidSpeechRecognizerEngine @Inject constructor(
 
     private companion object {
         const val TAG = "AndroidStt"
+
+        /**
+         * Silence that ends an utterance.
+         *
+         * Two seconds is long enough to survive the pause in "set an alarm
+         * for... seven", and short enough that John does not sit there after
+         * the user has plainly finished.
+         */
+        const val SILENCE_BEFORE_END_MILLIS = 2_000L
+
+        /** Never end a turn in under this, however quiet the room is. */
+        const val MINIMUM_UTTERANCE_MILLIS = 1_500L
     }
 }

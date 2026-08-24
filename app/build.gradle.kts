@@ -25,10 +25,12 @@ android {
         vectorDrawables.useSupportLibrary = true
     }
     
-    packaging {
-        jniLibs {
-            useLegacyPackaging = false
-        }
+    // The .litertlm bundle is memory-mapped from disk and the LiteRT-LM JNI
+    // library is dlopen'd straight out of the APK, so neither may be stored
+    // deflated. A compressed .so is what produces "Failed to punch uncompressed
+    // elf file" at install time and an UnsatisfiedLinkError at runtime.
+    androidResources {
+        noCompress += listOf("litertlm", "so")
     }
 
     buildTypes {
@@ -61,6 +63,12 @@ android {
     }
 
     packaging {
+        // Extract .so files to the filesystem at install time rather than
+        // leaving them page-aligned inside the APK. LiteRT-LM's native loader
+        // needs a real path on disk on the API levels John supports.
+        jniLibs {
+            useLegacyPackaging = true
+        }
         resources.excludes += setOf(
             "/META-INF/{AL2.0,LGPL2.1}",
             "/META-INF/LICENSE.md",

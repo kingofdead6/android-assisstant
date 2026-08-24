@@ -2,7 +2,9 @@ package com.john.assistant.ai.model
 
 import android.app.ActivityManager
 import android.content.Context
+import android.net.Uri
 import android.os.StatFs
+import android.provider.OpenableColumns
 import com.john.assistant.core.util.AssistantLogger
 import com.john.assistant.data.preferences.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -17,6 +19,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import javax.inject.Inject
@@ -234,18 +237,142 @@ class ModelManager @Inject constructor(
     /** Adopt a model file the user picked from storage. */
     suspend fun importFrom(descriptor: ModelDescriptor, source: File): ModelState =
         withContext(Dispatchers.IO) {
-            val target = File(modelsDirectory, descriptor.fileName)
             val outcome = runCatching {
-                source.copyTo(target, overwrite = true)
-                ModelState.Installed(target.length())
-            }.getOrElse {
-                logger.warn(TAG, "Import of ${descriptor.id} failed", it)
+                source.inputStream().use { input -> writeToModelsDirectory(descriptor, input, source.length()) }
+            }.getOrElse { error ->
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                logger.warn(TAG, "Import of ${descriptor.id} failed", error)
                 ModelState.Failed("I couldn't copy that file.")
             }
 
             setState(descriptor.id, outcome)
             outcome
         }
+
+    /**
+     * Adopt a model the user picked with the system document picker.
+     *
+     * The document may live on an SD card, in Downloads or behind a cloud
+     * provider, so there is no file path to copy from — only a stream. It is
+     * copied in fixed-size chunks: these bundles are hundreds of megabytes and
+     * reading one into memory would kill the process on the phones this app
+     * targets.
+     *
+     * Staged through `.part` and renamed only on success, for the same reason
+     * downloads are: a truncated copy must never be loadable as weights.
+     */
+    suspend fun importFromUri(descriptor: ModelDescriptor, uri: Uri): ModelState =
+        withContext(Dispatchers.IO) {
+            val outcome = runCatching {
+                val declaredSize = declaredSizeOf(uri)
+                if (declaredSize > 0 && freeStorageMb() < declaredSize / BYTES_PER_MB + STORAGE_HEADROOM_MB) {
+                    return@runCatching ModelState.Failed(
+                        "Not enough free storage — this needs about ${declaredSize / BYTES_PER_MB} MB.",
+                    )
+                }
+
+                val stream = context.contentResolver.openInputStream(uri)
+                    ?: return@runCatching ModelState.Failed("I couldn't open that file.")
+
+                stream.use { input -> writeToModelsDirectory(descriptor, input, declaredSize) }
+            }.getOrElse { error ->
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                logger.warn(TAG, "Import of ${descriptor.id} from $uri failed", error)
+                ModelState.Failed("I couldn't copy that file.")
+            }
+
+            setState(descriptor.id, outcome)
+            if (outcome is ModelState.Installed) {
+                logger.info(TAG, "Imported ${descriptor.displayName} (${outcome.sizeBytes} bytes)")
+            }
+            outcome
+        }
+
+    /**
+     * Stream [input] into the models directory under the descriptor's file name.
+     *
+     * [expectedBytes] is only used to report progress; it is 0 when the source
+     * will not say how big it is, in which case the UI shows an indeterminate
+     * copy rather than a wrong percentage.
+     */
+    private suspend fun writeToModelsDirectory(
+        descriptor: ModelDescriptor,
+        input: InputStream,
+        expectedBytes: Long,
+    ): ModelState {
+        val target = File(modelsDirectory, descriptor.fileName)
+        val partial = File(modelsDirectory, "${descriptor.fileName}.part")
+        partial.delete()
+
+        setState(descriptor.id, ModelState.Downloading(0, 0))
+
+        try {
+            input.buffered(DOWNLOAD_BUFFER_BYTES).use { buffered ->
+                partial.outputStream().buffered(DOWNLOAD_BUFFER_BYTES).use { output ->
+                    val buffer = ByteArray(DOWNLOAD_BUFFER_BYTES)
+                    var copied = 0L
+                    var lastReportedPercent = -1
+
+                    while (true) {
+                        if (!currentCoroutineContext().isActive) {
+                            throw kotlinx.coroutines.CancellationException("Import cancelled")
+                        }
+
+                        val read = buffered.read(buffer)
+                        if (read < 0) break
+
+                        output.write(buffer, 0, read)
+                        copied += read
+
+                        val percent = if (expectedBytes > 0) {
+                            ((copied * 100) / expectedBytes).toInt().coerceIn(0, 100)
+                        } else {
+                            0
+                        }
+                        if (percent != lastReportedPercent) {
+                            lastReportedPercent = percent
+                            setState(
+                                descriptor.id,
+                                ModelState.Downloading(percent, (copied / BYTES_PER_MB).toInt()),
+                            )
+                        }
+                    }
+
+                    output.flush()
+                }
+            }
+
+            if (partial.length() == 0L) {
+                partial.delete()
+                return ModelState.Failed("That file is empty.")
+            }
+
+            // Rename only once the whole copy is on disk.
+            target.delete()
+            if (!partial.renameTo(target)) {
+                partial.delete()
+                return ModelState.Failed("I couldn't save that file.")
+            }
+
+            return ModelState.Installed(target.length())
+        } catch (error: Throwable) {
+            partial.delete()
+            throw error
+        }
+    }
+
+    /** Size the provider reports for [uri], or 0 when it will not say. */
+    private fun declaredSizeOf(uri: Uri): Long = runCatching {
+        context.contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)
+            ?.use { cursor ->
+                val column = cursor.getColumnIndex(OpenableColumns.SIZE)
+                if (column >= 0 && cursor.moveToFirst() && !cursor.isNull(column)) {
+                    cursor.getLong(column)
+                } else {
+                    0L
+                }
+            } ?: 0L
+    }.getOrDefault(0L)
 
     private fun fileState(descriptor: ModelDescriptor): ModelState {
         val file = File(modelsDirectory, descriptor.fileName)

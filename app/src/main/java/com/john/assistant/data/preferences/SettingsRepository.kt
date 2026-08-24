@@ -36,6 +36,7 @@ data class JohnSettings(
     val maxResponseTokens: Int = 256,
     val activeModelId: String? = null,
     val huggingFaceModelId: String = "",
+    val llmBackend: LlmBackendChoice = LlmBackendChoice.DEFAULT,
     val phraseResultsWithLlm: Boolean = false,
 
     // Voice
@@ -128,6 +129,11 @@ class SettingsRepository @Inject constructor(
 
     suspend fun setActiveModel(modelId: String?) = update { it.copy(activeModelId = modelId) }
 
+    /** Which engine the user picked. Read on every turn, so routing follows settings. */
+    suspend fun getActiveBackend(): LlmBackendChoice = current().llmBackend
+
+    suspend fun setActiveBackend(choice: LlmBackendChoice) = update { it.copy(llmBackend = choice) }
+
     /** Restore every setting to its default. Does not touch history or memory. */
     suspend fun resetToDefaults() {
         context.dataStore.edit { it.clear() }
@@ -141,6 +147,7 @@ class SettingsRepository @Inject constructor(
             maxResponseTokens = preferences[Keys.MAX_TOKENS] ?: defaults.maxResponseTokens,
             activeModelId = preferences[Keys.ACTIVE_MODEL],
             huggingFaceModelId = preferences[Keys.HUGGING_FACE_MODEL] ?: defaults.huggingFaceModelId,
+            llmBackend = LlmBackendChoice.fromStoredName(preferences[Keys.LLM_BACKEND]),
             phraseResultsWithLlm = preferences[Keys.PHRASE_WITH_LLM] ?: defaults.phraseResultsWithLlm,
 
             wakeWordEnabled = preferences[Keys.WAKE_WORD_ENABLED] ?: defaults.wakeWordEnabled,
@@ -178,6 +185,7 @@ class SettingsRepository @Inject constructor(
         settings.activeModelId?.let { preferences[Keys.ACTIVE_MODEL] = it }
             ?: preferences.remove(Keys.ACTIVE_MODEL)
         preferences[Keys.HUGGING_FACE_MODEL] = settings.huggingFaceModelId
+        preferences[Keys.LLM_BACKEND] = settings.llmBackend.name
         preferences[Keys.PHRASE_WITH_LLM] = settings.phraseResultsWithLlm
 
         preferences[Keys.WAKE_WORD_ENABLED] = settings.wakeWordEnabled
@@ -209,6 +217,7 @@ class SettingsRepository @Inject constructor(
         val MAX_TOKENS = intPreferencesKey("max_tokens")
         val ACTIVE_MODEL = stringPreferencesKey("active_model")
         val HUGGING_FACE_MODEL = stringPreferencesKey("hugging_face_model")
+        val LLM_BACKEND = stringPreferencesKey("llm_backend")
         val PHRASE_WITH_LLM = booleanPreferencesKey("phrase_with_llm")
 
         val WAKE_WORD_ENABLED = booleanPreferencesKey("wake_word_enabled")

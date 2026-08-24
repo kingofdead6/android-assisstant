@@ -1,5 +1,8 @@
 package com.john.assistant.presentation.models
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -24,6 +27,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -33,6 +38,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,6 +47,12 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.john.assistant.ai.model.ModelState
 import com.john.assistant.ai.model.ModelStatus
+import com.john.assistant.data.preferences.LlmBackendChoice
+import kotlinx.coroutines.launch
+
+// .litertlm and .gguf have no registered MIME type, so the picker cannot filter
+// on one without hiding the file the user came to select.
+private const val ANY_MIME_TYPE = "*/*"
 
 /**
  * The model manager.
@@ -65,13 +77,20 @@ fun ModelsScreen(
     val deviceRam by viewModel.deviceRamMb.collectAsStateWithLifecycle()
     val runtimeName by viewModel.runtimeName.collectAsStateWithLifecycle()
     val configuredHuggingFaceModel by viewModel.huggingFaceModelId.collectAsStateWithLifecycle()
+    val isImporting by viewModel.isImporting.collectAsStateWithLifecycle()
+    val activeBackend by viewModel.activeBackend.collectAsStateWithLifecycle()
+    val routesLocally = activeBackend != LlmBackendChoice.HUGGING_FACE
     var huggingFaceToken by remember { mutableStateOf(viewModel.huggingFaceToken()) }
     var huggingFaceModel by remember { mutableStateOf(configuredHuggingFaceModel) }
     LaunchedEffect(configuredHuggingFaceModel) {
         huggingFaceModel = configuredHuggingFaceModel
     }
 
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("AI models") },
@@ -94,9 +113,17 @@ fun ModelsScreen(
                 HuggingFaceCard(
                     token = huggingFaceToken,
                     modelId = huggingFaceModel,
+                    isActive = !routesLocally,
                     onTokenChange = { huggingFaceToken = it },
                     onModelChange = { huggingFaceModel = it },
-                    onSave = { viewModel.saveHuggingFace(huggingFaceToken, huggingFaceModel) },
+                    onSave = {
+                        viewModel.saveHuggingFace(huggingFaceToken, huggingFaceModel)
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar(
+                                "John is now answering with $huggingFaceModel",
+                            )
+                        }
+                    },
                 )
             }
 
@@ -131,7 +158,10 @@ fun ModelsScreen(
             items(statuses, key = { it.descriptor.id }) { status ->
                 ModelCard(
                     status = status,
+                    isImporting = isImporting,
+                    routesLocally = routesLocally,
                     onDownload = { url -> viewModel.download(status, url) },
+                    onImport = { uri -> viewModel.importFromUri(status, uri) },
                     onSelect = { viewModel.select(status) },
                     onDelete = { viewModel.delete(status) },
                 )
@@ -144,18 +174,43 @@ fun ModelsScreen(
 private fun HuggingFaceCard(
     token: String,
     modelId: String,
+    isActive: Boolean,
     onTokenChange: (String) -> Unit,
     onModelChange: (String) -> Unit,
     onSave: () -> Unit,
 ) {
+    // The same two preconditions HuggingFaceLlmEngine enforces before it will
+    // send a request. Checking them here means the button cannot save a
+    // configuration that the engine would immediately refuse to use.
+    val isConfigured = token.isNotBlank() && modelId.isNotBlank()
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f),
+            containerColor = if (isActive) {
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+            } else {
+                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f)
+            },
         ),
     ) {
         Column(Modifier.padding(16.dp)) {
-            Text("Hugging Face API", style = MaterialTheme.typography.titleLarge)
+            // Mirrors the model rows: the card that is actually answering says
+            // so, so the screen can never show two engines both looking chosen.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Hugging Face API", style = MaterialTheme.typography.titleLarge)
+                if (isActive) {
+                    Text(
+                        text = "In use",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
             Spacer(Modifier.height(6.dp))
             Text(
                 "Use a hosted text-generation model instead of downloading weights to this phone.",
@@ -166,7 +221,7 @@ private fun HuggingFaceCard(
             OutlinedTextField(
                 value = token,
                 onValueChange = onTokenChange,
-                label = { Text("API token (optional for public models)") },
+                label = { Text("API token (required)") },
                 visualTransformation = PasswordVisualTransformation(),
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
@@ -180,11 +235,38 @@ private fun HuggingFaceCard(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
+
+            // Name the missing half rather than just greying the button out.
+            if (!isConfigured) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = if (token.isBlank()) {
+                        "Add an API token to use a hosted model. The Inference API " +
+                            "rejects anonymous requests."
+                    } else {
+                        "Add a model ID, for example HuggingFaceH4/zephyr-7b-beta."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.tertiary,
+                )
+            }
+
+            if (isActive) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "Prompts are sent to Hugging Face rather than staying on this phone.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
             Spacer(Modifier.height(10.dp))
             Button(
                 onClick = onSave,
-                enabled = modelId.isNotBlank(),
-            ) { Text("Use Hugging Face model") }
+                enabled = isConfigured,
+            ) {
+                Text(if (isActive) "Save changes" else "Use Hugging Face model")
+            }
         }
     }
 }
@@ -192,13 +274,24 @@ private fun HuggingFaceCard(
 @Composable
 private fun ModelCard(
     status: ModelStatus,
+    isImporting: Boolean,
+    routesLocally: Boolean,
     onDownload: (String) -> Unit,
+    onImport: (Uri) -> Unit,
     onSelect: () -> Unit,
     onDelete: () -> Unit,
 ) {
     var urlEntry by remember { mutableStateOf(status.descriptor.downloadUrl) }
     var showUrlField by remember { mutableStateOf(false) }
     val model = status.descriptor
+
+    // The system document picker. Launched with a wildcard MIME type
+    // (ANY_MIME_TYPE) because .litertlm and .gguf have no registered type, and
+    // providers that guess report application/octet-stream inconsistently —
+    // filtering on that would hide the very file the user came here to pick.
+    val pickModelFile = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri -> uri?.let(onImport) }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -274,7 +367,20 @@ private fun ModelCard(
                             TextButton(onClick = { showUrlField = false }) { Text("Cancel") }
                         }
                     } else {
-                        Button(onClick = { showUrlField = true }) { Text("Get this model") }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = { showUrlField = true }) { Text("Get this model") }
+                            OutlinedButton(
+                                onClick = { pickModelFile.launch(arrayOf(ANY_MIME_TYPE)) },
+                                enabled = !isImporting,
+                            ) { Text("Import file") }
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            text = "Already downloaded ${model.fileName} on this phone? " +
+                                "Import it instead of downloading it again.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
 
@@ -290,11 +396,25 @@ private fun ModelCard(
                     )
                 }
 
-                is ModelState.Installed -> Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    if (!status.isActive) {
-                        Button(onClick = onSelect) { Text("Use this one") }
+                is ModelState.Installed -> Column {
+                    // Offered even when this model is already the active one, so
+                    // long as answers are still going somewhere else. Without it
+                    // a row reading "In use" next to a remote-routed assistant
+                    // has no button that fixes the mismatch.
+                    if (!status.isActive || !routesLocally) {
+                        Button(onClick = onSelect) {
+                            Text(if (status.isActive) "Answer with this model" else "Use this one")
+                        }
+                        Spacer(Modifier.height(8.dp))
+                    }
+                    if (status.isActive && !routesLocally) {
+                        Text(
+                            text = "Installed and selected, but John is answering with the " +
+                                "Hugging Face API right now.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.tertiary,
+                        )
+                        Spacer(Modifier.height(8.dp))
                     }
                     OutlinedButton(onClick = onDelete) { Text("Delete") }
                 }
@@ -306,7 +426,13 @@ private fun ModelCard(
                         color = MaterialTheme.colorScheme.error,
                     )
                     Spacer(Modifier.height(8.dp))
-                    Button(onClick = { showUrlField = true }) { Text("Try again") }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = { showUrlField = true }) { Text("Try again") }
+                        OutlinedButton(
+                            onClick = { pickModelFile.launch(arrayOf(ANY_MIME_TYPE)) },
+                            enabled = !isImporting,
+                        ) { Text("Import file") }
+                    }
                 }
             }
         }

@@ -1,6 +1,7 @@
 package com.john.assistant
 
 import android.app.Application
+import com.john.assistant.core.llm.LlmEngine
 import com.john.assistant.core.util.AssistantLogger
 import com.john.assistant.data.preferences.SettingsRepository
 import com.john.assistant.data.repository.ConversationRepository
@@ -31,6 +32,8 @@ class JohnApplication : Application() {
 
     @Inject lateinit var session: AssistantSession
 
+    @Inject lateinit var llmEngine: LlmEngine
+
     @Inject lateinit var logger: AssistantLogger
 
     @Inject lateinit var applicationScope: CoroutineScope
@@ -50,6 +53,17 @@ class JohnApplication : Application() {
                 logger.info(TAG, "Resuming background wake-word listening")
                 AssistantForegroundService.start(this@JohnApplication)
             }
+
+            // Load the selected on-device model in the background.
+            //
+            // Nothing used to call warmUp() at all, so weights only ever loaded
+            // on the first request that reached the engine — and readiness was
+            // gated on them already being loaded, which never happened. This is
+            // off the main thread and failure is non-fatal: LocalLlmEngine
+            // retries lazily in generate(), and the deterministic matcher
+            // answers meanwhile.
+            runCatching { llmEngine.warmUp() }
+                .onFailure { logger.warn(TAG, "Model warm-up failed", it) }
         }
     }
 

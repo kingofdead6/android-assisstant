@@ -40,9 +40,20 @@ class PermissionManager @Inject constructor(
      * Activity, so John remembers what it has asked so the dashboard can offer
      * the app-settings route instead of a dialog that will not appear.
      */
-    private val asked = mutableSetOf<PermissionKey>()
+    private val asked: MutableSet<PermissionKey> =
+        java.util.Collections.synchronizedSet(mutableSetOf())
 
-    private val _states = MutableStateFlow(snapshot())
+    /**
+     * Seeded empty, not with [snapshot].
+     *
+     * This object is built while Hilt is assembling the graph, before
+     * `Application.onCreate` has finished. Querying `Settings.Secure` and
+     * `getSystemService` at that point is what turns a device-specific quirk
+     * into a crash on launch with no UI to report it, so the first real read
+     * happens in [refresh] — called by the dashboard — and every accessor below
+     * tolerates being asked before then.
+     */
+    private val _states = MutableStateFlow<List<PermissionState>>(emptyList())
 
     /** Dashboard state. Call [refresh] after returning from a settings screen. */
     val states: StateFlow<List<PermissionState>> = _states.asStateFlow()
@@ -50,7 +61,20 @@ class PermissionManager @Inject constructor(
     override suspend fun isGranted(permission: PermissionKey): Boolean =
         statusOf(permission).isUsable
 
-    fun statusOf(key: PermissionKey): PermissionStatus =
+    /**
+     * Where [key] stands.
+     *
+     * Never throws. Every branch below touches a platform API that a
+     * manufacturer build can fail in its own way, and a permission check that
+     * throws would take down whichever tool asked. An unreadable permission is
+     * reported as not granted, which is the safe direction: John asks rather
+     * than assuming it may act.
+     */
+    fun statusOf(key: PermissionKey): PermissionStatus = runCatching {
+        statusOfUnchecked(key)
+    }.getOrElse { PermissionStatus.DENIED }
+
+    private fun statusOfUnchecked(key: PermissionKey): PermissionStatus =
         when (val permission = PermissionCatalogue.forKey(key)) {
             is Permission.Implicit -> PermissionStatus.NOT_REQUIRED
 
@@ -147,14 +171,21 @@ class PermissionManager @Inject constructor(
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
             true
         } else {
-            (context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager)
-                ?.canScheduleExactAlarms() == true
+            runCatching {
+                (context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager)
+                    ?.canScheduleExactAlarms() == true
+            }.getOrDefault(false)
         }
 
+    /**
+     * Every row, rebuilt. Safe to call before the first frame: [statusOf]
+     * absorbs a platform failure per key rather than losing the whole list.
+     */
     private fun snapshot(): List<PermissionState> = PermissionKey.entries.map(::stateOf)
 
-    private fun isRuntimeGranted(permission: String): Boolean =
+    private fun isRuntimeGranted(permission: String): Boolean = runCatching {
         context.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
+    }.getOrDefault(false)
 
     private fun isSpecialAccessGranted(key: PermissionKey): Boolean = when (key) {
         PermissionKey.NOTIFICATION_ACCESS -> isNotificationAccessGranted()
