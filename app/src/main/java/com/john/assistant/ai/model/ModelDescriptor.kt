@@ -5,6 +5,9 @@ import com.john.assistant.core.llm.ChatTemplate
 /** What kind of model this is. */
 enum class ModelKind { LANGUAGE, SPEECH_TO_TEXT, TEXT_TO_SPEECH, WAKE_WORD }
 
+/** Capabilities used when choosing a model for an assistant request. */
+enum class ModelCapability { GENERAL_LLM }
+
 /**
  * One model John can use.
  *
@@ -24,6 +27,7 @@ data class ModelDescriptor(
     val fileName: String,
     /** Where the weights come from. Empty for models John cannot fetch itself. */
     val downloadUrl: String,
+    val capabilities: Set<ModelCapability> = emptySet(),
     val template: ChatTemplate = ChatTemplate.PLAIN,
     val contextTokens: Int = 2048,
     val licence: String,
@@ -53,6 +57,27 @@ data class ModelDescriptor(
 object ModelCatalogue {
 
     val LANGUAGE_MODELS = listOf(
+        ModelDescriptor(
+            id = "gemma-3-1b-it-litertlm",
+            displayName = "Gemma 3 1B Instruct (LiteRT-LM)",
+            kind = ModelKind.LANGUAGE,
+            sizeMb = 584,
+            requiredRamMb = 1_400,
+            fileName = "gemma3-1b-it-int4.litertlm",
+            downloadUrl = "",
+            capabilities = setOf(ModelCapability.GENERAL_LLM),
+            // PLAIN on purpose, and it must stay that way. A .litertlm bundle
+            // carries its own chat template and applies it inside Conversation,
+            // so rendering Gemma control tokens here too would wrap every turn
+            // twice — the exact degradation docs/local-ai.md warns about, where
+            // the model drifts into continuing the conversation and its JSON
+            // falls apart. LocalLlmEngine renders the transcript with PLAIN and
+            // LiteRtLmBackend hands it over as a single user message.
+            template = ChatTemplate.PLAIN,
+            contextTokens = 4096,
+            licence = "Gemma Terms of Use",
+            notes = "Runs on the bundled LiteRT-LM runtime. Check Google's Gemma terms before shipping.",
+        ),
         ModelDescriptor(
             id = "qwen2.5-1.5b-instruct-q4",
             displayName = "Qwen 2.5 1.5B Instruct (Q4)",

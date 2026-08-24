@@ -63,8 +63,10 @@ has the full list with API references.
 - **The bundled wake word uses continuous speech recognition**, which costs
   noticeably more battery than a dedicated keyword spotter. It is off by
   default, and the architecture is ready for Porcupine or openWakeWord.
-- **No inference runtime is bundled.** Choosing and shipping a native `.so` is
-  the app builder's decision; `docs/local-ai.md` explains how.
+- **The inference runtime ships; the weights do not.** John bundles LiteRT-LM,
+  which carries its own native libraries, so there is nothing to compile. No
+  model file is included — a 584 MB download belongs to the user, not the APK.
+  Until one is installed, the deterministic matcher answers everything.
 
 ---
 
@@ -105,8 +107,10 @@ does nothing.
 RAM requirement and licence shown *before* anything downloads. Nothing downloads
 on its own.
 
-Running a model also needs a native inference runtime, which this repository
-does not bundle. See `docs/local-ai.md`.
+The LiteRT-LM runtime is already in the APK, so a `.litertlm` model file is the
+only thing missing. Paste a download URL or copy a file you already have — the
+catalogue ships no URLs on purpose, because model repositories move. See
+`docs/local-ai.md`.
 
 ### 5. Enable the wake word (optional)
 

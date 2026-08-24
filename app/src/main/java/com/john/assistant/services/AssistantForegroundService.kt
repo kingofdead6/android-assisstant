@@ -143,6 +143,7 @@ class AssistantForegroundService : Service() {
         const val CHANNEL_ID = "john_assistant"
         const val ACTION_STOP = "com.john.assistant.action.STOP_LISTENING"
 
+        private const val TAG = "ForegroundService"
         private const val NOTIFICATION_ID = 1001
         private const val REQUEST_OPEN = 1
         private const val REQUEST_STOP = 2

@@ -24,6 +24,12 @@ android {
         testInstrumentationRunner = "com.john.assistant.JohnTestRunner"
         vectorDrawables.useSupportLibrary = true
     }
+    
+    packaging {
+        jniLibs {
+            useLegacyPackaging = false
+        }
+    }
 
     buildTypes {
         debug {
@@ -98,6 +104,8 @@ dependencies {
 
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.security.crypto)
+
+    implementation(libs.litertlm.android)
 
     testImplementation(libs.junit4)
     testImplementation(libs.kotlinx.coroutines.test)

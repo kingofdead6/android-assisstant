@@ -77,15 +77,22 @@
 
     <application
         android:name=".JohnApplication"
-        android:allowBackup="false"
+        android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="false"
+        android:usesCleartextTraffic="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.John"
         tools:targetApi="35">
+
+        <!-- LiteRT-LM dlopen()s these when a GPU backend is selected. Marked
+             not required: most phones have neither, and the CPU backend John
+             ships with must still install and run there. -->
+        <uses-native-library android:name="libvndksupport.so" android:required="false" />
+        <uses-native-library android:name="libOpenCL.so" android:required="false" />
 
         <activity
             android:name=".MainActivity"

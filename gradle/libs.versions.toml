@@ -1,7 +1,7 @@
 [versions]
-agp = "8.7.3"
-kotlin = "2.0.21"
-ksp = "2.0.21-1.0.28"
+agp = "8.13.2"
+kotlin = "2.3.20"
+ksp = "2.3.11"
 coroutines = "1.9.0"
 serialization = "1.7.3"
 coreKtx = "1.13.1"
@@ -9,11 +9,12 @@ lifecycle = "2.8.7"
 activityCompose = "1.9.3"
 composeBom = "2024.10.01"
 navigationCompose = "2.8.4"
-hilt = "2.52"
+hilt = "2.58"
 hiltNavigationCompose = "1.2.0"
-room = "2.6.1"
+room = "2.8.4"
 datastore = "1.1.1"
 security = "1.1.0-alpha06"
+litertlm = "0.16.1"
 junit4 = "4.13.2"
 junitJupiter = "5.11.3"
 androidxTestJunit = "1.2.1"
@@ -61,6 +62,11 @@ room-testing = { module = "androidx.room:room-testing", version.ref = "room" }
 # --- Storage / background ---
 androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
 androidx-security-crypto = { module = "androidx.security:security-crypto", version.ref = "security" }
+
+# --- On-device inference ---
+# LiteRT-LM ships its native libraries inside the AAR, so there is no NDK
+# build, no CMake and no JNI shim to maintain in this repository.
+litertlm-android = { module = "com.google.ai.edge.litertlm:litertlm-android", version.ref = "litertlm" }
 
 # --- Test ---
 junit4 = { module = "junit:junit", version.ref = "junit4" }

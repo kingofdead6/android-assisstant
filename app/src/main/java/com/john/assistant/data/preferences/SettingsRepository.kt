@@ -35,6 +35,7 @@ data class JohnSettings(
     val temperature: Float = 0.2f,
     val maxResponseTokens: Int = 256,
     val activeModelId: String? = null,
+    val huggingFaceModelId: String = "",
     val phraseResultsWithLlm: Boolean = false,
 
     // Voice
@@ -139,6 +140,7 @@ class SettingsRepository @Inject constructor(
             temperature = preferences[Keys.TEMPERATURE] ?: defaults.temperature,
             maxResponseTokens = preferences[Keys.MAX_TOKENS] ?: defaults.maxResponseTokens,
             activeModelId = preferences[Keys.ACTIVE_MODEL],
+            huggingFaceModelId = preferences[Keys.HUGGING_FACE_MODEL] ?: defaults.huggingFaceModelId,
             phraseResultsWithLlm = preferences[Keys.PHRASE_WITH_LLM] ?: defaults.phraseResultsWithLlm,
 
             wakeWordEnabled = preferences[Keys.WAKE_WORD_ENABLED] ?: defaults.wakeWordEnabled,
@@ -175,6 +177,7 @@ class SettingsRepository @Inject constructor(
         preferences[Keys.MAX_TOKENS] = settings.maxResponseTokens
         settings.activeModelId?.let { preferences[Keys.ACTIVE_MODEL] = it }
             ?: preferences.remove(Keys.ACTIVE_MODEL)
+        preferences[Keys.HUGGING_FACE_MODEL] = settings.huggingFaceModelId
         preferences[Keys.PHRASE_WITH_LLM] = settings.phraseResultsWithLlm
 
         preferences[Keys.WAKE_WORD_ENABLED] = settings.wakeWordEnabled
@@ -205,6 +208,7 @@ class SettingsRepository @Inject constructor(
         val TEMPERATURE = floatPreferencesKey("temperature")
         val MAX_TOKENS = intPreferencesKey("max_tokens")
         val ACTIVE_MODEL = stringPreferencesKey("active_model")
+        val HUGGING_FACE_MODEL = stringPreferencesKey("hugging_face_model")
         val PHRASE_WITH_LLM = booleanPreferencesKey("phrase_with_llm")
 
         val WAKE_WORD_ENABLED = booleanPreferencesKey("wake_word_enabled")

@@ -27,7 +27,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -62,6 +64,12 @@ fun ModelsScreen(
     val statuses by viewModel.statuses.collectAsStateWithLifecycle()
     val deviceRam by viewModel.deviceRamMb.collectAsStateWithLifecycle()
     val runtimeName by viewModel.runtimeName.collectAsStateWithLifecycle()
+    val configuredHuggingFaceModel by viewModel.huggingFaceModelId.collectAsStateWithLifecycle()
+    var huggingFaceToken by remember { mutableStateOf(viewModel.huggingFaceToken()) }
+    var huggingFaceModel by remember { mutableStateOf(configuredHuggingFaceModel) }
+    LaunchedEffect(configuredHuggingFaceModel) {
+        huggingFaceModel = configuredHuggingFaceModel
+    }
 
     Scaffold(
         topBar = {
@@ -82,6 +90,16 @@ fun ModelsScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            item {
+                HuggingFaceCard(
+                    token = huggingFaceToken,
+                    modelId = huggingFaceModel,
+                    onTokenChange = { huggingFaceToken = it },
+                    onModelChange = { huggingFaceModel = it },
+                    onSave = { viewModel.saveHuggingFace(huggingFaceToken, huggingFaceModel) },
+                )
+            }
+
             item {
                 Card(
                     colors = CardDefaults.cardColors(
@@ -118,6 +136,55 @@ fun ModelsScreen(
                     onDelete = { viewModel.delete(status) },
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun HuggingFaceCard(
+    token: String,
+    modelId: String,
+    onTokenChange: (String) -> Unit,
+    onModelChange: (String) -> Unit,
+    onSave: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f),
+        ),
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Text("Hugging Face API", style = MaterialTheme.typography.titleLarge)
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "Use a hosted text-generation model instead of downloading weights to this phone.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(12.dp))
+            OutlinedTextField(
+                value = token,
+                onValueChange = onTokenChange,
+                label = { Text("API token (optional for public models)") },
+                visualTransformation = PasswordVisualTransformation(),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = modelId,
+                onValueChange = onModelChange,
+                label = { Text("Model ID") },
+                placeholder = { Text("owner/model-name") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(10.dp))
+            Button(
+                onClick = onSave,
+                enabled = modelId.isNotBlank(),
+            ) { Text("Use Hugging Face model") }
         }
     }
 }

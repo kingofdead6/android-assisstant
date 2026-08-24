@@ -11,6 +11,7 @@ import com.john.assistant.core.tool.ToolRegistry
 import com.john.assistant.data.preferences.JohnSettings
 import com.john.assistant.data.preferences.SettingsRepository
 import com.john.assistant.data.repository.ConversationRepository
+import com.john.assistant.integrations.huggingface.HuggingFaceAuth
 import com.john.assistant.core.memory.MemoryEntry
 import com.john.assistant.core.memory.MemoryStore
 import com.john.assistant.permissions.PermissionManager
@@ -33,6 +34,7 @@ class SettingsViewModel @Inject constructor(
     private val textToSpeech: TextToSpeechEngine,
     private val permissionManager: PermissionManager,
     private val session: AssistantSession,
+    private val huggingFaceAuth: HuggingFaceAuth,
 ) : ViewModel() {
 
     val settings: StateFlow<JohnSettings> = settingsRepository.settings
@@ -60,6 +62,13 @@ class SettingsViewModel @Inject constructor(
     fun setSystemPrompt(value: String) = update { it.copy(systemPrompt = value) }
 
     fun setPhraseWithLlm(enabled: Boolean) = update { it.copy(phraseResultsWithLlm = enabled) }
+
+    fun huggingFaceToken(): String = huggingFaceAuth.token().orEmpty()
+
+    fun setHuggingFace(token: String, modelId: String) {
+        huggingFaceAuth.setToken(token)
+        update { it.copy(huggingFaceModelId = modelId.trim()) }
+    }
 
     // --- voice ----------------------------------------------------------
 

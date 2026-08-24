@@ -6,6 +6,7 @@ import com.john.assistant.ai.llm.LlmBackend
 import com.john.assistant.ai.model.ModelManager
 import com.john.assistant.ai.model.ModelStatus
 import com.john.assistant.data.preferences.SettingsRepository
+import com.john.assistant.integrations.huggingface.HuggingFaceAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,6 +19,7 @@ class ModelsViewModel @Inject constructor(
     private val modelManager: ModelManager,
     private val settingsRepository: SettingsRepository,
     private val backend: LlmBackend,
+    private val huggingFaceAuth: HuggingFaceAuth,
 ) : ViewModel() {
 
     private val _statuses = MutableStateFlow(modelManager.statuses())
@@ -29,9 +31,15 @@ class ModelsViewModel @Inject constructor(
     private val _runtimeName = MutableStateFlow(backend.name)
     val runtimeName: StateFlow<String> = _runtimeName.asStateFlow()
 
+    private val _huggingFaceModelId = MutableStateFlow("")
+    val huggingFaceModelId: StateFlow<String> = _huggingFaceModelId.asStateFlow()
+
     val hasRuntime: Boolean get() = backend.isSupported
 
     init {
+        viewModelScope.launch {
+            settingsRepository.settings.collect { _huggingFaceModelId.value = it.huggingFaceModelId }
+        }
         // Download progress lives in the manager, so mirror its state rather
         // than duplicating it here.
         viewModelScope.launch {
@@ -64,6 +72,15 @@ class ModelsViewModel @Inject constructor(
             modelManager.delete(status.descriptor)
             if (modelManager.activeModel() == null) settingsRepository.setActiveModel(null)
             _statuses.value = modelManager.statuses()
+        }
+    }
+
+    fun huggingFaceToken(): String = huggingFaceAuth.token().orEmpty()
+
+    fun saveHuggingFace(token: String, modelId: String) {
+        huggingFaceAuth.setToken(token)
+        viewModelScope.launch {
+            settingsRepository.update { it.copy(huggingFaceModelId = modelId.trim()) }
         }
     }
 }

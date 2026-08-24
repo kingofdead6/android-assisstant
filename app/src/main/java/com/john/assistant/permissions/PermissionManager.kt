@@ -33,12 +33,6 @@ import javax.inject.Singleton
 class PermissionManager @Inject constructor(
     @ApplicationContext private val context: Context,
 ) : PermissionGate {
-
-    private val _states = MutableStateFlow(snapshot())
-
-    /** Dashboard state. Call [refresh] after returning from a settings screen. */
-    val states: StateFlow<List<PermissionState>> = _states.asStateFlow()
-
     /**
      * Keys the user has been asked about and declined.
      *
@@ -47,6 +41,11 @@ class PermissionManager @Inject constructor(
      * the app-settings route instead of a dialog that will not appear.
      */
     private val asked = mutableSetOf<PermissionKey>()
+
+    private val _states = MutableStateFlow(snapshot())
+
+    /** Dashboard state. Call [refresh] after returning from a settings screen. */
+    val states: StateFlow<List<PermissionState>> = _states.asStateFlow()
 
     override suspend fun isGranted(permission: PermissionKey): Boolean =
         statusOf(permission).isUsable

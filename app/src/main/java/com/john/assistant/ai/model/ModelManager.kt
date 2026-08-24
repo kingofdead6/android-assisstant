@@ -4,13 +4,16 @@ import android.app.ActivityManager
 import android.content.Context
 import android.os.StatFs
 import com.john.assistant.core.util.AssistantLogger
+import com.john.assistant.data.preferences.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -56,6 +59,8 @@ data class ModelStatus(
 class ModelManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val logger: AssistantLogger,
+    private val settingsRepository: SettingsRepository,
+    private val scope: CoroutineScope,
 ) {
 
     private val modelsDirectory: File by lazy {
@@ -70,6 +75,12 @@ class ModelManager @Inject constructor(
 
     init {
         refresh()
+        scope.launch {
+            settingsRepository.settings.collect { settings ->
+                _activeModelId.value = settings.activeModelId
+                    ?.takeIf(::isModelInstalled)
+            }
+        }
     }
 
     /** Re-scan the models directory. Cheap; safe to call on screen resume. */
@@ -81,6 +92,9 @@ class ModelManager @Inject constructor(
 
     fun activeModel(): ModelDescriptor? = _activeModelId.value?.let(ModelCatalogue::byId)
 
+    fun isModelInstalled(id: String): Boolean =
+        ModelCatalogue.byId(id)?.let { fileState(it) is ModelState.Installed } == true
+
     /** Select an installed model. No-op for one that is not downloaded. */
     fun selectModel(id: String?): Boolean {
         if (id == null) {
@@ -88,7 +102,7 @@ class ModelManager @Inject constructor(
             return true
         }
         val descriptor = ModelCatalogue.byId(id) ?: return false
-        if (fileState(descriptor) !is ModelState.Installed) return false
+        if (!isModelInstalled(id)) return false
         _activeModelId.value = id
         return true
     }

@@ -38,7 +38,10 @@ CACHE="${1:-${JOHN_VERIFY_CACHE:-$ROOT/.verify-cache}}"
 LIBS="$CACHE/libs"
 MAVEN="${JOHN_MAVEN_MIRROR:-https://repo1.maven.org/maven2}"
 
-KOTLIN_VERSION="2.0.21"
+# Must track `kotlin` in gradle/libs.versions.toml. A compiler older than the
+# one that built :core cannot read its metadata, and every verified file then
+# fails with "unresolved reference" against a jar that is perfectly fine.
+KOTLIN_VERSION="2.3.20"
 COROUTINES_VERSION="1.9.0"
 SERIALIZATION_VERSION="1.7.3"
 ANDROID_ALL="14-robolectric-10818077"
@@ -73,7 +76,10 @@ ANDROID_JAR=$(fetch "$MAVEN/org/robolectric/android-all/$ANDROID_ALL/android-all
 # resolve against real classes rather than another set of stubs.
 echo "Building :core"
 "$ROOT/gradlew" -p "$ROOT" -PskipAndroidModules=true :core:jar -q --console=plain
-CORE_JAR="$(find "$ROOT/core/build/libs" -name '*.jar' | head -1)"
+# Named exactly, not globbed: core/build/libs also holds core-test-fixtures.jar
+# once :core:test has run, and it sorts first. Picking it silently drops every
+# main-source class and fails the whole run with "unresolved reference".
+CORE_JAR="$(find "$ROOT/core/build/libs" -name 'core.jar' | head -1)"
 
 COMPILER_CP="$COMPILER:$STDLIB:$REFLECT:$SCRIPT_RT:$DAEMON:$TROVE:$COROUTINES"
 TARGET_CP="$ANDROID_JAR:$STDLIB:$REFLECT:$INJECT:$COROUTINES:$SERIALIZATION:$SERIALIZATION_CORE:$CORE_JAR"

@@ -1,8 +1,9 @@
 package com.john.assistant.di
 
-import com.john.assistant.ai.llm.LlamaCppBackend
+import com.john.assistant.ai.llm.LiteRtLmBackend
 import com.john.assistant.ai.llm.LlmBackend
 import com.john.assistant.ai.llm.LocalLlmEngine
+import com.john.assistant.ai.llm.ConfiguredLlmEngine
 import com.john.assistant.ai.stt.AndroidSpeechRecognizerEngine
 import com.john.assistant.ai.tts.AndroidTextToSpeechEngine
 import com.john.assistant.ai.wakeword.SpeechRecognizerWakeWordEngine
@@ -47,13 +48,18 @@ object AiModule {
     /**
      * The native runtime.
      *
-     * [LlamaCppBackend] reports itself unsupported when its `.so` is absent,
-     * which is this repository's default. Swap this binding to plug in
-     * MediaPipe LLM Inference, ONNX Runtime or LiteRT.
+     * [LiteRtLmBackend] carries its own native libraries in its AAR, so this is
+     * the one runtime that needs no NDK build to work. It still reports itself
+     * unsupported if those classes are missing from the APK, which keeps a
+     * stripped build falling back to the deterministic matcher rather than
+     * crashing on the first utterance.
+     *
+     * `LlamaCppBackend` remains in the tree, unbound, for anyone who would
+     * rather ship their own llama.cpp `.so`; swapping is this one line.
      */
     @Provides
     @Singleton
-    fun provideLlmBackend(backend: LlamaCppBackend): LlmBackend = backend
+    fun provideLlmBackend(backend: LiteRtLmBackend): LlmBackend = backend
 
     /**
      * Deterministic first, model second.
@@ -65,7 +71,7 @@ object AiModule {
     @Singleton
     fun provideLlmEngine(
         ruleBased: RuleBasedLlmEngine,
-        local: LocalLlmEngine,
+        local: ConfiguredLlmEngine,
         logger: AssistantLogger,
     ): LlmEngine = CompositeLlmEngine(fast = ruleBased, fallback = local, logger = logger)
 

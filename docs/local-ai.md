@@ -16,20 +16,25 @@ interface WakeWordEngine     // "Hey John"
 | Component | Shipped implementation | Runs on-device? |
 |---|---|---|
 | Intent | `RuleBasedLlmEngine` — deterministic phrase matcher | Yes, always |
-| LLM | `LocalLlmEngine` + a swappable `LlmBackend` | Yes, once a runtime is added |
+| LLM | `LocalLlmEngine` + `LiteRtLmBackend` (LiteRT-LM) | Yes, once a model is installed |
 | Speech-to-text | `AndroidSpeechRecognizerEngine` | Depends on the installed recogniser |
 | Text-to-speech | `AndroidTextToSpeechEngine` | Depends on the installed TTS app |
 | Wake word | `SpeechRecognizerWakeWordEngine` | Same as above; battery-heavy |
 
 Two of those need explaining honestly.
 
-**No inference runtime is bundled.** Shipping a prebuilt native `.so` would add
-tens of megabytes of code nobody reading this repository could audit, and the
-choice of runtime belongs to whoever builds the app. So `LlamaCppBackend`
-reports `isSupported = false` when its library is absent, `LocalLlmEngine`
-reports itself not ready, and `CompositeLlmEngine` serves the deterministic
-matcher instead. John works — the model manager just says no runtime is
-installed.
+**The runtime ships; the weights do not.** John depends on
+[LiteRT-LM](https://github.com/google-ai-edge/LiteRT-LM), which ships its native
+libraries inside its AAR — there is no NDK build, no CMake and no JNI shim in
+this repository, and nothing to compile before inference works. What is still
+absent is a model: a `.litertlm` file is hundreds of megabytes that belong to
+the user rather than the APK. Until one is installed `LocalLlmEngine` reports
+itself not ready and `CompositeLlmEngine` serves the deterministic matcher, so
+John works out of the box and the model manager says plainly what is missing.
+
+`LiteRtLmBackend` still checks for its own classes at runtime rather than
+assuming them, so a build that strips the dependency degrades to the matcher
+instead of dying on a missing class at the first utterance.
 
 **The wake word uses continuous recognition.** A purpose-built keyword spotter
 is the right answer and John's architecture is built for one. What ships is the
@@ -40,37 +45,39 @@ battery. It is off by default.
 
 ## Adding a language model
 
-### 1. Provide a native runtime
+### 1. The runtime is already there
 
-Build [llama.cpp](https://github.com/ggerganov/llama.cpp) for Android with its
-JNI bindings and place the result at:
+Nothing to build. `LiteRtLmBackend` binds LiteRT-LM
+(`com.google.ai.edge.litertlm:litertlm-android`, pinned in
+`gradle/libs.versions.toml`), whose AAR carries `liblitertlm_jni.so` for every
+supported ABI.
 
-```
-app/src/main/jniLibs/arm64-v8a/libllama-android.so
-```
+It runs on `Backend.CPU()`. The manifest also declares `libvndksupport.so` and
+`libOpenCL.so` as `android:required="false"` so a GPU backend can be selected
+later without an install-time failure on the many phones that have neither.
 
-`LlamaCppBackend` expects three JNI entry points:
+Two properties of the implementation are worth knowing before changing it:
 
-```kotlin
-private external fun nativeLoadModel(path: String, contextTokens: Int): Long
-private external fun nativeGenerate(
-    handle: Long, prompt: String, maxTokens: Int,
-    temperature: Float, topP: Float, stopSequences: Array<String>,
-): String?
-private external fun nativeFreeModel(handle: Long)
-```
-
-`System.loadLibrary` is wrapped in a `runCatching`, so a missing library is a
-capability that is absent — not a crash at some later moment.
+- **A fresh `Conversation` per generation.** The orchestrator sends the whole
+  history it wants the model to see on every turn, so holding LiteRT-LM's KV
+  cache across turns would replay that history twice.
+- **Stop sequences are applied in Kotlin.** The API has no stop-sequence option,
+  so `LiteRtLmBackend` truncates the completion itself. `ToolCallParser` is
+  strict, and one trailing control token on otherwise valid JSON is the
+  difference between an executed command and a spoken shrug.
 
 **Other runtimes.** Implement `LlmBackend` and change one binding:
 
 ```kotlin
 @Provides @Singleton
-fun provideLlmBackend(backend: MediaPipeLlmBackend): LlmBackend = backend
+fun provideLlmBackend(backend: LlamaCppBackend): LlmBackend = backend
 ```
 
-MediaPipe LLM Inference, ONNX Runtime Mobile and LiteRT all fit the same
+`LlamaCppBackend` is still in the tree for exactly this, unbound. It expects a
+llama.cpp build with JNI bindings at
+`app/src/main/jniLibs/arm64-v8a/libllama-android.so`; `System.loadLibrary` is
+wrapped in `runCatching`, so a missing library is a capability that is absent
+rather than a crash at some later moment. ONNX Runtime Mobile fits the same
 four-method interface. `arm64-v8a` is the only ABI worth targeting for
 inference; 32-bit devices do not have the memory.
 
@@ -94,15 +101,22 @@ them, and nothing else can read them.
 
 | Model | Download | RAM | Notes |
 |---|---|---|---|
+| Gemma 3 1B Instruct (`.litertlm`) | ~584 MB | ~1.4 GB | **The only entry the shipped runtime can load.** Check Google's Gemma terms |
 | Llama 3.2 1B Instruct Q4 | ~800 MB | ~1.2 GB | Lightest. Fast, but drops arguments on longer commands |
 | Qwen 2.5 1.5B Instruct Q4 | ~1.1 GB | ~1.6 GB | Best size/quality trade for tool selection |
 | Gemma 2 2B Instruct Q4 | ~1.6 GB | ~2.2 GB | Check Google's Gemma terms before shipping |
 | Qwen 2.5 3B Instruct Q4 | ~2.0 GB | ~2.8 GB | Noticeably better on unusual phrasing; wants 6 GB RAM |
 | Phi 3.5 Mini Instruct Q4 | ~2.3 GB | ~3.0 GB | Strong structured output; heaviest here |
 
-Q4_K_M quantisation is the usual sweet spot. `ModelDescriptor.fitsIn` requires
+The `.gguf` rows are llama.cpp formats and are listed for whoever swaps the
+binding back; `LiteRtLmBackend.supportedExtensions` is `litertlm` alone. Q4_K_M
+quantisation is the usual sweet spot there. `ModelDescriptor.fitsIn` requires
 roughly double the model's footprint before calling a device suitable — loading
 to the limit thrashes rather than runs.
+
+`.litertlm` bundles for Gemma 3 are published by the `litert-community`
+organisation on Hugging Face; `gemma3-1b-it-int4.litertlm` is the file the
+catalogue entry names.
 
 ### 4. Match the prompt template
 
@@ -118,6 +132,15 @@ setting. `ChatTemplateTest` pins each format.
 Gemma has no system role, so the system prompt is folded into the first user
 turn. Tool observations are presented as user turns in every template: no small
 model handles a distinct tool role reliably.
+
+**Entries that target LiteRT-LM must use `ChatTemplate.PLAIN`.** This looks
+wrong and is not. A `.litertlm` bundle carries its own chat template and applies
+it inside `Conversation`, while `LocalLlmEngine` has already rendered the
+transcript before the backend sees it. Choosing `GEMMA` here would wrap every
+turn in control tokens twice — precisely the degradation described above, where
+the model drifts into continuing the conversation and its JSON falls apart. So
+the catalogue renders a plain transcript and hands it over as a single user
+message, letting the bundle apply the real Gemma format exactly once.
 
 ---
 
@@ -223,13 +246,15 @@ fun provideWakeWord(engine: PorcupineWakeWordEngine): WakeWordEngine = engine
 
 ## Performance notes
 
-- Inference runs on `Dispatchers.Default` and is serialised — llama.cpp contexts
-  are not thread-safe, and two concurrent generations corrupt the KV cache
-  rather than failing cleanly.
+- Inference runs on `Dispatchers.Default` and is serialised behind a `Mutex` — an
+  inference context is not safe to drive from two coroutines at once, and
+  concurrent generations corrupt decoder state rather than failing cleanly.
 - `LlmOptions.timeoutMillis` (20 s default) bounds every generation. A stalled
   model degrades to a spoken apology, not a frozen orb.
 - The model loads lazily on first use, not at startup: a cold start should not
-  pay for a model the user may never invoke this session.
+  pay for a model the user may never invoke this session. `Engine.initialize()`
+  can take ten seconds on a large bundle, which is why it never runs on the main
+  thread.
 - `LlmEngine.unload()` frees the weights so the OS can reclaim the memory.
 - The deterministic matcher runs first, so the common commands never touch the
   model at all — which is the single biggest thing keeping battery usage sane.
